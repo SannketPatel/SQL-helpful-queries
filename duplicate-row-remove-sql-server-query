@@ -1,0 +1,49 @@
+-- TO REMOVE THE DUPLICATE ENTRIES FROM SAME TABLE.
+-- change ROWCOUNT value to remove duplicate records.
+-- I had case where there was two identical records, I wanted to remove one from it. So I used ROWCOUNT 1. 
+-- If you have 10 identical records and want to remove 9 then use ROWCOUNT 9.
+-- Cursor is used to loop for all records taken into @tbl table type variable.
+
+--- double issue --- 4851047628982 4851306201270 
+DECLARE @id VARCHAR(50) -- database name 
+declare @tbl as table(
+	id varchar(50),
+	cnt int,
+	shorderid varchar(100),
+	sku varchar(100),
+	Qty_shipped int, 
+	sorderid varchar(100),
+	created_at datetime,
+	lastUpdated datetime
+) 
+
+insert into @tbl
+select NEWID(),count(*), SHOrderId, Sku, Qty_shipped, SOrderId, Created_at, LastUpdated from [dbo].[OSH] 
+where LastUpdated > '2023-03-16 05:52'
+group by SHOrderId, Sku, Qty_shipped, SOrderId, Created_at, LastUpdated having count(*) > 1 
+order by SHOrderId, Sku
+
+
+DECLARE db_cursor CURSOR FOR 
+SELECT id 
+FROM @tbl
+
+OPEN db_cursor  
+FETCH NEXT FROM db_cursor INTO @id  
+
+WHILE @@FETCH_STATUS = 0  
+BEGIN  
+	  
+		SET ROWCOUNT 1
+		delete o from [dbo].[OSH] o
+		inner join @tbl t on t.shorderid = o.SHOrderId
+		where o.SHOrderId = t.shorderid and o.Sku = t.sku and o.SOrderId = t.sorderid and o.Created_at = t.created_at
+		and t.id = @id
+		SET ROWCOUNT 0
+
+      FETCH NEXT FROM db_cursor INTO @id
+END 
+
+CLOSE db_cursor  
+DEALLOCATE db_cursor 
+
